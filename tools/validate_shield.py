@@ -38,9 +38,11 @@ def dt_property(text, prop):
     """Return the raw text between `prop = <` and its matching `>`.
 
     The lookbehind stops `map` from matching inside `gpio-map`.
-    Handles comments between the property name and `=`.
+    Handles // comments between property name and `=`.
     """
-    start = re.search(r"(?<![\w-])" + re.escape(prop) + r"(?:[^=]*?)=\s*<", text)
+    start = re.search(
+        r"(?<![\w-])" + re.escape(prop) + r"(?:\s*//[^\n]*)?\s*=\s*<", text
+    )
     if not start:
         raise ValueError("property %r not found" % prop)
     index = start.end()
@@ -141,12 +143,27 @@ def check_transform():
 
 def layout_keys():
     text = read(SHIELD + "/unix60-layouts.dtsi")
-    body = dt_property(text, "keys")
+    # Find the entire keys property: from `keys` to the terminating `;`
+    # Handle both single-bracket form `= <...>` and comma-separated form `= <...>, <...>`.
+    match = re.search(
+        r"(?<![\w-])keys\s*(?://[^\n]*)?\s*=\s*(.*?);", text, re.S
+    )
+    if not match:
+        raise ValueError("keys property not found")
+    body = match.group(1)
+
+    # Extract all <...> groups and concatenate them
+    # This handles both = <...> and = <...>, <...> forms.
+    bracket_bodies = []
+    for bracket_match in re.finditer(r"<(.*?)>", body, re.S):
+        bracket_bodies.append(bracket_match.group(1))
+    full_body = " ".join(bracket_bodies)
+
     return [
         tuple(int(n) for n in m[:4])
         for m in re.findall(
             r"&key_physical_attrs\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)",
-            body,
+            full_body,
         )
     ]
 
@@ -184,23 +201,33 @@ def check_layout():
 
     # Every key must start exactly where the previous one ended.
     gaps = []
-    for index, (y, row) in enumerate(rows):
+    for _, (y, row) in enumerate(rows):
         for (x1, w1), (x2, _) in zip(row, row[1:]):
             if x1 + w1 != x2:
                 gaps.append((y, x1, x1 + w1, x2))
     check("no gaps or overlaps within any row", not gaps, "at %r" % (gaps,))
 
-    spans = [(row[0][0], row[-1][0] + row[-1][1]) for _, row in rows]
-    check(
-        "rows 0-3 span 0 to 1500",
-        all(s == (0, 1500) for s in spans[:4]),
-        "got %r" % (spans[:4],),
-    )
-    check(
-        "row 4 spans 150 to 1350, leaving 1.5u blockers",
-        spans[4] == (150, 1350),
-        "got %r" % (spans[4],),
-    )
+    # Check row spans only if we have the expected 5 rows.
+    if len(rows) >= 5:
+        spans = [(row[0][0], row[-1][0] + row[-1][1]) for _, row in rows]
+        check(
+            "rows 0-3 span 0 to 1500",
+            all(s == (0, 1500) for s in spans[:4]),
+            "got %r" % (spans[:4],),
+        )
+        check(
+            "row 4 spans 150 to 1350, leaving 1.5u blockers",
+            spans[4] == (150, 1350),
+            "got %r" % (spans[4],),
+        )
+    else:
+        check("rows 0-3 span 0 to 1500", False, "only %d rows" % len(rows))
+        check(
+            "row 4 spans 150 to 1350, leaving 1.5u blockers",
+            False,
+            "only %d rows" % len(rows),
+        )
+
     check("every key is 100 units tall", all(h == 100 for _, h, _, _ in keys))
 
 
