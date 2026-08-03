@@ -16,7 +16,11 @@
 - Row pro_micro pins, in order: `1 0 2 3 4 5 6` (QMK `D3 D2 D1 D0 D4 C6 D7`).
 - Column pro_micro pins, in order: `7 8 9 21 20 19 18 15 14` (QMK `E6 B4 B5 F4 F5 F6 F7 B1 B3`).
 - Exactly 60 keys. Rows contain 15 / 14 / 13 / 13 / 5 keys.
-- `Kconfig.shield` and `Kconfig.defconfig` are already correct. **Do not modify them.**
+- `Kconfig.shield` and `Kconfig.defconfig` are already correct. **Do not modify
+  their contents** — but note they are UNTRACKED in git and must be committed.
+  This wording originally said only "do not modify them", and every implementer
+  correctly left them alone while nobody committed them; the first push shipped
+  a shield with no `SHIELD_UNIX60` definition. Fixed in Task 5 fix round 1.
 - Validator must use only the Python 3 standard library. No pip installs.
 - Work directly on `main` and push to `origin main`. The user explicitly
   authorised this for this piece of work, overriding the usual branch-first
