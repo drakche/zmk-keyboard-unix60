@@ -1,9 +1,14 @@
-# zmk-unix-60
+# zmk-keyboard-unix60
 
-ZMK firmware user config for the [FR4Boards Unix60](https://github.com/mkdl/Unix60),
-a 60% HHKB-layout PCB (true HHKB: 2u backspace split into `\` + `` ` ``, unsplit
-right shift replaced by a split left shift on the alternate position, seven-key
-bottom row). The shield itself lives in `boards/shields/unix60/`; see
+ZMK firmware for the [FR4Boards Unix60](https://github.com/mkdl/Unix60), a 60%
+PCB in the true HHKB layout: a split backspace (`\` and `` ` `` as two 1u keys
+where ANSI puts one 2u backspace), a split right shift (1.75u shift plus a 1u
+`Fn`), and a five-key bottom row with 1.5u blockers at each end. This is *not*
+the HHKB/Tsangan variant, which has a 2u backspace, an unsplit right shift and a
+seven-key bottom row — ZMK's in-tree `layout_60_hhkb` is that variant, which is
+why this shield defines its own physical layout.
+
+The shield lives in `boards/shields/unix60/`; see
 [`boards/shields/unix60/README.md`](boards/shields/unix60/README.md) for
 build/flash instructions, hardware pin mapping and provenance details. This
 file is a keymap reference — what every key does, on both layers.
@@ -15,7 +20,7 @@ Two layers are defined in `boards/shields/unix60/unix60.keymap`:
 | Layer | Display name | How to reach it |
 | --- | --- | --- |
 | 0 | `Base` | Active by default |
-| 1 | `Fn` | Hold the bottom-right key on the Base layer (`&mo 1`) |
+| 1 | `Fn` | Hold `Fn` — the 1u key right of the right shift (`&mo 1`) |
 
 Both are ported 1:1 from `unix60.json` (a QMK Configurator export for
 `LAYOUT_60_hhkb`, vendored at the repo root). The only additions on top of
@@ -34,10 +39,11 @@ which occupy slots the export left blank (`KC_TRNS`).
 |        | ALT |  GUI   |               SPACE               |   GUI  | ALT |        |
 ```
 
-A standard HHKB-ish QWERTY layer: full alpha block, a dedicated `` ` ``/`\`
-column where a Tsangan layout would put a wider backspace, split shift keys,
-and the Fn key (momentary layer 1) in the bottom-right corner where a
-Tsangan/ANSI bottom row would put a right Ctrl.
+A standard HHKB QWERTY layer: full alpha block, `\` and `` ` `` as separate 1u
+keys at the right of the number row where ANSI puts a 2u backspace, `Ctrl` on
+the Caps Lock position, and `Fn` (momentary layer 1) as the rightmost key of the
+shift row. The bottom row is `Alt` `GUI` `Space` `GUI` `Alt` — five keys, with
+the 1.5u blockers the HHKB case requires at each end.
 
 ## Fn layer
 
