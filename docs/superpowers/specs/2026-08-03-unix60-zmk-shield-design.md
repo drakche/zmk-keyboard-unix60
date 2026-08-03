@@ -25,13 +25,45 @@ keyboard PCB.
 
 ## Target hardware
 
-`nice_nano_v2`, standing in for a generic "Pro Micro nRF52840" / "SuperMini
-nRF52840" clone. These are pin-compatible with the nice!nano v2 and the
-community builds them under that target.
+`nice_nano_v2`, standing in for the board silkscreened "Pro Micro nRF52840"
+(also sold as "SuperMini nRF52840"), sourced from AliExpress listing
+`1005007205026373`. Pin-compatible with the nice!nano v2 and built under that
+target by the community.
 
-Known limitation of that substitution: clones vary in their battery voltage
-divider and onboard LED wiring, so reported battery percentage may be
-inaccurate. This does not affect key scanning.
+The board has been reverse-engineered in
+[sasodoma/nrf52840-promicro](https://github.com/sasodoma/nrf52840-promicro),
+which supplies the two hardware facts below.
+
+**Battery reporting works.** The battery connects directly to `VDDH`
+(high-voltage mode), as on the nice!nano v2, and `nice_nano_v2.dts` selects
+`compatible = "zmk,battery-nrf-vddh"` — internal VDDH sensing through the SoC,
+using no GPIO. The clone's external battery divider is misrouted (silkscreened
+`P0.04`, actually wired to `P0.24`, which has no ADC channel), but ZMK never
+reads it, so the fault is inert. Voltage reads high while USB is connected;
+that is also true of a genuine nice!nano.
+
+**`P0.24` carries one extra onboard load, and it is a matrix row.** The
+misrouted divider taps `P0.24` between R10 (to `VBAT`) and R11 (to `GND`).
+`P0.24` is `pro_micro` pin 5, which the Unix60 hardwires to matrix row 5 —
+the `Z X C V B N M ,` row. Cross-checking all 16 matrix pins against the
+schematic's nets, `P0.24` is the only one with a connection beyond its
+castellated pad.
+
+This is assessed as low risk and is not designed around:
+
+- The divider is high-impedance against the nRF52840's ~13k internal
+  pull-down, so the row still idles low and still reads high when a column
+  drives it.
+- R10/R11 values are not recorded in the reverse-engineering and may not be
+  populated at all. Even at 100k/100k the tap sits well under the logic
+  threshold.
+- It could not be designed around regardless: the Unix60 PCB fixes row 5 to
+  that pad, so the shield cannot reassign it without cutting traces.
+
+Residual risk to watch for on hardware: phantom or stuck keys confined to the
+`Z`–`,` row. Removing R10 eliminates both that risk and the divider's parasitic
+battery drain at no cost, since ZMK cannot use the divider anyway. Recommended
+only if symptoms appear.
 
 The shield is written against the `&pro_micro` nexus, not against `&gpio0`/
 `&gpio1` directly, so it builds unchanged on any pro-micro-footprint board
@@ -218,4 +250,6 @@ The user has authorised this push.
   would drive.
 - Tuning the keymap beyond the 1:1 port plus the eight wireless keys. Combos,
   hold-taps, and additional layers are the user's to add later.
-- Battery-reporting calibration for clone controllers.
+- Any workaround for the misrouted `P0.24` battery divider. It is inert to ZMK,
+  and the optional R10 removal is a hardware change for the user to make only
+  if phantom keys appear on the `Z`–`,` row.
