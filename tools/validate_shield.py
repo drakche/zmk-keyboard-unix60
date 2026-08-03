@@ -38,8 +38,9 @@ def dt_property(text, prop):
     """Return the raw text between `prop = <` and its matching `>`.
 
     The lookbehind stops `map` from matching inside `gpio-map`.
+    Handles comments between the property name and `=`.
     """
-    start = re.search(r"(?<![\w-])" + re.escape(prop) + r"\s*=\s*<", text)
+    start = re.search(r"(?<![\w-])" + re.escape(prop) + r"(?:[^=]*?)=\s*<", text)
     if not start:
         raise ValueError("property %r not found" % prop)
     index = start.end()
@@ -138,9 +139,75 @@ def check_transform():
     )
 
 
+def layout_keys():
+    text = read(SHIELD + "/unix60-layouts.dtsi")
+    body = dt_property(text, "keys")
+    return [
+        tuple(int(n) for n in m[:4])
+        for m in re.findall(
+            r"&key_physical_attrs\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)",
+            body,
+        )
+    ]
+
+
+def check_layout():
+    text = read(SHIELD + "/unix60-layouts.dtsi")
+    keys = layout_keys()
+
+    check("layout node is named unix60_layout", "unix60_layout:" in text)
+    check("layout binds the transform", "transform = <&default_transform>" in text)
+    check("layout binds the kscan", "kscan = <&kscan>" in text)
+    check("layout has 60 keys", len(keys) == KEY_COUNT, "got %d" % len(keys))
+    check(
+        "layout key count equals transform entry count",
+        len(keys) == len(transform_entries()),
+    )
+
+    # Group keys by their y coordinate, preserving order.
+    rows = []
+    for w, h, x, y in keys:
+        if not rows or rows[-1][0] != y:
+            rows.append((y, []))
+        rows[-1][1].append((x, w))
+
+    check(
+        "layout has 5 rows at y = 0,100,200,300,400",
+        [y for y, _ in rows] == [0, 100, 200, 300, 400],
+        "got %r" % ([y for y, _ in rows],),
+    )
+    check(
+        "row key counts are 15/14/13/13/5",
+        [len(r) for _, r in rows] == ROW_LENGTHS,
+        "got %r" % ([len(r) for _, r in rows],),
+    )
+
+    # Every key must start exactly where the previous one ended.
+    gaps = []
+    for index, (y, row) in enumerate(rows):
+        for (x1, w1), (x2, _) in zip(row, row[1:]):
+            if x1 + w1 != x2:
+                gaps.append((y, x1, x1 + w1, x2))
+    check("no gaps or overlaps within any row", not gaps, "at %r" % (gaps,))
+
+    spans = [(row[0][0], row[-1][0] + row[-1][1]) for _, row in rows]
+    check(
+        "rows 0-3 span 0 to 1500",
+        all(s == (0, 1500) for s in spans[:4]),
+        "got %r" % (spans[:4],),
+    )
+    check(
+        "row 4 spans 150 to 1350, leaving 1.5u blockers",
+        spans[4] == (150, 1350),
+        "got %r" % (spans[4],),
+    )
+    check("every key is 100 units tall", all(h == 100 for _, h, _, _ in keys))
+
+
 def main():
     check_matrix()
     check_transform()
+    check_layout()
 
     width = max(len(name) for name, _, _ in RESULTS)
     failed = 0
