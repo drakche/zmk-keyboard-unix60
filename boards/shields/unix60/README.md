@@ -3,6 +3,12 @@
 ZMK shield for the [FR4Boards Unix60](https://github.com/mkdl/Unix60), a 60%
 HHKB-layout PCB that takes a Pro Micro footprint controller.
 
+The shield name is `unix60` — that is what you pass as `-DSHIELD=unix60`, and it
+matches this directory and every filename in it. It ships in the
+`zmk-keyboard-unix60` module ([repo](https://github.com/drakche/zmk-keyboard-unix60)),
+which you can add to another config's `west.yml` rather than cloning; see the
+[repo README](../../../README.md#using-this-from-your-own-config).
+
 ## Building
 
 Firmware is built by GitHub Actions on every push (see `build.yaml`); there is

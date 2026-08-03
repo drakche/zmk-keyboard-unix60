@@ -235,7 +235,7 @@ miscounts, transposed pins, duplicated matrix positions, geometry drift. It does
 not prove the files compile.
 
 **Stage 2 — GitHub Actions.** Push the branch to `origin`
-(`git@github.com:drakche/zmk-unix-60.git`). The repo's existing
+(`git@github.com:drakche/zmk-keyboard-unix60.git`). The repo's existing
 `.github/workflows/build.yml` calls `zmkfirmware/zmk/.github/workflows/build-user-config.yml@v0.3`
 and runs on `push`, so it compiles both build entries. This is the real proof.
 Report the CI result and fix anything it catches.

@@ -13,6 +13,37 @@ The shield lives in `boards/shields/unix60/`; see
 build/flash instructions, hardware pin mapping and provenance details. This
 file is a keymap reference — what every key does, on both layers.
 
+## Names
+
+Three names are in play, and they are deliberately different:
+
+| | Value | Where it appears |
+| --- | --- | --- |
+| Repository | `zmk-keyboard-unix60` | the GitHub URL |
+| Module | `zmk-keyboard-unix60` | `name:` in `zephyr/module.yml` |
+| Shield | `unix60` | `-DSHIELD=unix60`, and every filename under `boards/shields/unix60/` |
+
+The module name follows ZMK's [`zmk-<type>-<description>`
+convention](https://zmk.dev/docs/development/module-creation). The shield name is
+the short one you pass to the build.
+
+### Using this from your own config
+
+Because the module is named, you can build the Unix60 from another ZMK config
+instead of cloning this one — add it to your `config/west.yml`:
+
+```yaml
+  remotes:
+    - name: drakche
+      url-base: https://github.com/drakche
+  projects:
+    - name: zmk-keyboard-unix60
+      remote: drakche
+      revision: main
+```
+
+then reference `shield: unix60` in your `build.yaml`.
+
 ## Layout at a glance
 
 Two layers are defined in `boards/shields/unix60/unix60.keymap`:

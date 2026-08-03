@@ -1091,7 +1091,7 @@ gh run watch "$(gh run list --branch main --limit 1 --json databaseId --jq '.[0]
 If `gh` is unavailable, poll instead:
 
 ```bash
-gh --version || echo "Open https://github.com/drakche/zmk-unix-60/actions and report the result"
+gh --version || echo "Open https://github.com/drakche/zmk-keyboard-unix60/actions and report the result"
 ```
 
 Expected: both matrix jobs succeed and upload `unix60` and `unix60_studio`
