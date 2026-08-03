@@ -617,6 +617,47 @@ def check_completeness():
         )
 
 
+def check_images():
+    """The SVG diagrams under images/ are generated from unix60-layouts.dtsi
+    and unix60.keymap by tools/render_keymap.py, not hand-drawn. Nothing else
+    catches the images drifting out of sync after a keymap or geometry edit
+    that forgot to re-run the renderer - and a misleading diagram in a
+    README is worse than no diagram. render_keymap.render_svg() renders each
+    layer to a string in memory (no files written) so this can compare
+    byte-for-byte against what's committed without ever touching disk.
+
+    The import is local, not at module level, because render_keymap.py
+    already does `import validate_shield as vs`; importing it back at
+    module level here would make the two files circularly import each
+    other on load.
+    """
+    import render_keymap as rk
+
+    keys = layout_keys()
+    layers = keymap_layers()
+    targets = [
+        ("base-layer.svg", 0, "Unix60 - Base layer"),
+        ("fn-layer.svg", 1, "Unix60 - Fn layer"),
+    ]
+    for filename, index, title in targets:
+        expected = rk.render_svg(keys, layers[index], title)
+        rel_path = SHIELD + "/images/" + filename
+        try:
+            actual = read(rel_path)
+        except OSError as exc:
+            check(
+                "[generated] %s matches render_keymap.py output" % filename,
+                False,
+                "%s: %s" % (rel_path, exc),
+            )
+            continue
+        check(
+            "[generated] %s matches render_keymap.py output" % filename,
+            actual == expected,
+            "stale image - re-run: python3 tools/render_keymap.py",
+        )
+
+
 def run_check_group(name, fn):
     """Run one check_* group, converting a crash into a single FAIL line
     instead of an uncaught traceback. This is the whole test suite, so a bug
@@ -636,6 +677,7 @@ def main():
     run_check_group("check_keymap", check_keymap)
     run_check_group("check_metadata", check_metadata)
     run_check_group("check_completeness", check_completeness)
+    run_check_group("check_images", check_images)
 
     width = max(len(name) for name, _, _ in RESULTS)
     failed = 0

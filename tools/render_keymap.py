@@ -74,7 +74,13 @@ def svg_escape(s):
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def render(name, keys, bindings, title):
+def render_svg(keys, bindings, title):
+    """Return the SVG text for one layer, without touching disk.
+
+    Kept separate from `render` below so callers that only want to compare
+    generated content against a committed file (tools/validate_shield.py)
+    never need to write anything out to do so.
+    """
     max_x = max(x + w for w, h, x, y in keys)
     max_y = max(y + h for w, h, x, y in keys)
     width = max_x * SCALE + 20
@@ -114,10 +120,15 @@ def render(name, keys, bindings, title):
             )
     parts.append("</svg>")
 
+    return "\n".join(parts) + "\n"
+
+
+def render(name, keys, bindings, title):
+    svg = render_svg(keys, bindings, title)
     os.makedirs(OUT_DIR, exist_ok=True)
     out_path = os.path.join(OUT_DIR, name)
     with open(out_path, "w", encoding="utf-8") as handle:
-        handle.write("\n".join(parts) + "\n")
+        handle.write(svg)
     print("wrote", os.path.relpath(out_path, vs.REPO))
 
 
