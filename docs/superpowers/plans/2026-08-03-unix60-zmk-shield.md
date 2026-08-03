@@ -312,7 +312,7 @@ same.
 Run: `python3 tools/validate_shield.py`
 
 Expected: every check listed so far reports PASS, and the summary reads
-`12 checks, 0 failed`.
+`13 checks, 0 failed`.
 
 - [ ] **Step 5: Commit**
 
@@ -518,7 +518,7 @@ Replace `boards/shields/unix60/unix60-layouts.dtsi` entirely:
 
 Run: `python3 tools/validate_shield.py`
 
-Expected: all checks PASS, summary reads `23 checks, 0 failed`.
+Expected: all checks PASS, summary reads `24 checks, 0 failed`.
 
 - [ ] **Step 5: Commit**
 
@@ -766,7 +766,7 @@ Replace `boards/shields/unix60/unix60.keymap` entirely:
 
 Run: `python3 tools/validate_shield.py`
 
-Expected: all checks PASS, summary reads `40 checks, 0 failed`.
+Expected: all checks PASS, summary reads `41 checks, 0 failed`.
 
 If `layer 0 matches unix60.json exactly` or
 `layer 1 matches unix60.json plus the 8 wireless keys` fails, the detail column
@@ -1003,7 +1003,7 @@ include:
 
 Run: `python3 tools/validate_shield.py`
 
-Expected: all checks PASS, summary reads `57 checks, 0 failed`.
+Expected: all checks PASS, summary reads `58 checks, 0 failed`.
 
 If `build.yaml has a plain unix60 entry` fails, the regex requires the plain
 entry to be followed by another list item. Confirm the plain entry comes first
@@ -1169,7 +1169,7 @@ steps with explicit commands and explicit criteria, not unfilled blanks.
 `unix60_layout`, `default_transform`, `kscan` are defined in Tasks 1-2 and
 referenced identically.
 
-Cumulative check counts are 12 (Task 1: 8 matrix + 4 transform), 23 (+11
-layout), 40 (+17 keymap) and 57 (+17 metadata). These are the expected totals
+Cumulative check counts are 13 (Task 1: 9 matrix + 4 transform), 24 (+11
+layout), 41 (+17 keymap) and 58 (+17 metadata). These are the expected totals
 if every check is added as written; treat a mismatch as a signal that a check
 was skipped or duplicated, not as a failure in itself.
