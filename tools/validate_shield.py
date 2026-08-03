@@ -168,6 +168,143 @@ def layout_keys():
     ]
 
 
+# QMK keycode -> ZMK binding. Every keycode used by unix60.json appears here.
+QMK_TO_ZMK = {
+    "KC_TRNS": "&trans",
+    "KC_ESC": "&kp ESC", "KC_GRV": "&kp GRAVE", "KC_MINS": "&kp MINUS",
+    "KC_EQL": "&kp EQUAL", "KC_BSLS": "&kp BSLH", "KC_TAB": "&kp TAB",
+    "KC_LBRC": "&kp LBKT", "KC_RBRC": "&kp RBKT", "KC_BSPC": "&kp BSPC",
+    "KC_LCTL": "&kp LCTRL", "KC_SCLN": "&kp SEMI", "KC_QUOT": "&kp SQT",
+    "KC_ENT": "&kp RET", "KC_LSFT": "&kp LSHFT", "KC_COMM": "&kp COMMA",
+    "KC_DOT": "&kp DOT", "KC_SLSH": "&kp FSLH", "KC_RSFT": "&kp RSHFT",
+    "KC_LALT": "&kp LALT", "KC_LGUI": "&kp LGUI", "KC_SPC": "&kp SPACE",
+    "KC_RGUI": "&kp RGUI", "KC_RALT": "&kp RALT",
+    "MO(1)": "&mo 1",
+    # Fn layer
+    "KC_PWR": "&kp K_POWER", "KC_INS": "&kp INS", "KC_DEL": "&kp DEL",
+    "KC_CAPS": "&kp CAPS", "KC_PSCR": "&kp PSCRN", "KC_SCRL": "&kp SLCK",
+    "KC_PAUS": "&kp PAUSE_BREAK", "KC_NUM": "&kp KP_NUM",
+    "KC_UP": "&kp UP", "KC_DOWN": "&kp DOWN",
+    "KC_LEFT": "&kp LEFT", "KC_RGHT": "&kp RIGHT",
+    "KC_HOME": "&kp HOME", "KC_END": "&kp END",
+    "KC_PGUP": "&kp PG_UP", "KC_PGDN": "&kp PG_DN",
+    "KC_VOLD": "&kp C_VOL_DN", "KC_VOLU": "&kp C_VOL_UP",
+    "KC_MUTE": "&kp C_MUTE", "KC_EJCT": "&kp C_EJECT",
+    "KC_MPRV": "&kp C_PREV", "KC_MPLY": "&kp C_PP",
+    "KC_MSTP": "&kp C_STOP", "KC_MNXT": "&kp C_NEXT",
+    "KC_PAST": "&kp KP_MULTIPLY", "KC_PSLS": "&kp KP_DIVIDE",
+    "KC_PENT": "&kp KP_ENTER", "KC_PPLS": "&kp KP_PLUS",
+    "KC_PMNS": "&kp KP_MINUS",
+}
+
+# Wireless keys substituted into &trans slots on the Fn layer. Position -> binding.
+FN_SUBSTITUTIONS = {
+    16: "&bt BT_SEL 0",   # Q
+    17: "&bt BT_SEL 1",   # W
+    18: "&bt BT_SEL 2",   # E
+    19: "&bt BT_SEL 3",   # R
+    20: "&bt BT_SEL 4",   # T
+    21: "&bt BT_CLR",     # Y
+    22: "&bootloader",    # U
+    27: "&sys_reset",     # ]
+}
+
+
+def qmk_to_zmk(code):
+    if code.startswith("KC_F") and code[4:].isdigit():
+        return "&kp F" + code[4:]
+    if re.fullmatch(r"KC_[A-Z]", code):
+        return "&kp " + code[3:]
+    if re.fullmatch(r"KC_[0-9]", code):
+        return "&kp N" + code[3:]
+    return QMK_TO_ZMK[code]
+
+
+def keymap_layers():
+    """Return the bindings of each keymap layer, as lists of strings."""
+    text = read(SHIELD + "/unix60.keymap")
+    layers = []
+    for block in re.findall(r"bindings\s*=\s*<(.*?)>\s*;", text, re.S):
+        code = re.sub(r"//[^\n]*", " ", block)
+        tokens = code.split()
+        bindings, current = [], None
+        for token in tokens:
+            if token.startswith("&"):
+                if current:
+                    bindings.append(" ".join(current))
+                current = [token]
+            elif current:
+                current.append(token)
+        if current:
+            bindings.append(" ".join(current))
+        layers.append(bindings)
+    return layers
+
+
+def check_keymap():
+    text = read(SHIELD + "/unix60.keymap")
+    layers = keymap_layers()
+    source = json.loads(read("unix60.json"))["layers"]
+
+    check("keymap includes behaviors.dtsi", "#include <behaviors.dtsi>" in text)
+    check("keymap includes keys.h", "dt-bindings/zmk/keys.h" in text)
+    check("keymap includes bt.h", "dt-bindings/zmk/bt.h" in text)
+    check("keymap has 2 layers", len(layers) == 2, "got %d" % len(layers))
+
+    if len(layers) != 2:
+        return
+
+    for index, bindings in enumerate(layers):
+        check(
+            "layer %d has 60 bindings" % index,
+            len(bindings) == KEY_COUNT,
+            "got %d" % len(bindings),
+        )
+
+    expected_base = [qmk_to_zmk(code) for code in source[0]]
+    check(
+        "layer 0 matches unix60.json exactly",
+        layers[0] == expected_base,
+        "first mismatch: %r" % (
+            next(
+                (
+                    (i, got, want)
+                    for i, (got, want) in enumerate(zip(layers[0], expected_base))
+                    if got != want
+                ),
+                None,
+            ),
+        ),
+    )
+
+    expected_fn = [qmk_to_zmk(code) for code in source[1]]
+    for position, binding in FN_SUBSTITUTIONS.items():
+        check(
+            "Fn position %d was a &trans slot before substitution" % position,
+            expected_fn[position] == "&trans",
+            "unix60.json has %r there" % source[1][position],
+        )
+        expected_fn[position] = binding
+    check(
+        "layer 1 matches unix60.json plus the 8 wireless keys",
+        layers[1] == expected_fn,
+        "first mismatch: %r" % (
+            next(
+                (
+                    (i, got, want)
+                    for i, (got, want) in enumerate(zip(layers[1], expected_fn))
+                    if got != want
+                ),
+                None,
+            ),
+        ),
+    )
+    check(
+        "exactly 8 wireless keys were substituted",
+        len(FN_SUBSTITUTIONS) == 8,
+    )
+
+
 def check_layout():
     text = read(SHIELD + "/unix60-layouts.dtsi")
     keys = layout_keys()
@@ -235,6 +372,7 @@ def main():
     check_matrix()
     check_transform()
     check_layout()
+    check_keymap()
 
     width = max(len(name) for name, _, _ in RESULTS)
     failed = 0

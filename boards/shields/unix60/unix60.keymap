@@ -1,0 +1,53 @@
+/*
+ * Copyright (c) 2026 The ZMK Contributors
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Ported 1:1 from unix60.json (QMK Configurator export, LAYOUT_60_hhkb).
+ * The only additions are the Bluetooth, bootloader and reset keys, which
+ * occupy slots the export left as KC_TRNS.
+ */
+
+#include <behaviors.dtsi>
+#include <dt-bindings/zmk/keys.h>
+#include <dt-bindings/zmk/bt.h>
+
+/ {
+    keymap {
+        compatible = "zmk,keymap";
+
+        default_layer {
+// ---------------------------------------------------------------------------------------------
+// | ESC |  1  |  2  |  3  |  4  |  5  |  6  |  7  |  8  |  9  |  0  |  -  |  =  |  \  |  `  |
+// |  TAB   |  Q  |  W  |  E  |  R  |  T  |  Y  |  U  |  I  |  O  |  P  |  [  |  ]  |  BSPC  |
+// |  CTRL    |  A  |  S  |  D  |  F  |  G  |  H  |  J  |  K  |  L  |  ;  |  '  |   ENTER    |
+// |   SHIFT     |  Z  |  X  |  C  |  V  |  B  |  N  |  M  |  ,  |  .  |  /  | SHIFT  |  FN  |
+// |        | ALT |  GUI   |               SPACE               |   GUI  | ALT |        |
+// ---------------------------------------------------------------------------------------------
+            bindings = <
+&kp ESC   &kp N1 &kp N2 &kp N3 &kp N4 &kp N5 &kp N6 &kp N7 &kp N8 &kp N9 &kp N0 &kp MINUS &kp EQUAL &kp BSLH &kp GRAVE
+&kp TAB   &kp Q  &kp W  &kp E  &kp R  &kp T  &kp Y  &kp U  &kp I  &kp O  &kp P  &kp LBKT  &kp RBKT  &kp BSPC
+&kp LCTRL &kp A  &kp S  &kp D  &kp F  &kp G  &kp H  &kp J  &kp K  &kp L  &kp SEMI &kp SQT &kp RET
+&kp LSHFT &kp Z  &kp X  &kp C  &kp V  &kp B  &kp N  &kp M  &kp COMMA &kp DOT &kp FSLH &kp RSHFT &mo 1
+&kp LALT  &kp LGUI &kp SPACE &kp RGUI &kp RALT
+            >;
+        };
+
+        fn_layer {
+// ---------------------------------------------------------------------------------------------
+// | PWR | F1  | F2  | F3  | F4  | F5  | F6  | F7  | F8  | F9  | F10 | F11 | F12 | INS | DEL |
+// |  CAPS  | BT0 | BT1 | BT2 | BT3 | BT4 |BTCLR| BOOT| PSCR| SCRL|PAUSE|  UP |RESET|  NUM   |
+// |          | VOLD| VOLU| MUTE| EJCT|     | KP* | KP/ | HOME| PGUP| LEFT|RIGHT|   KPENT    |
+// |             |MPREV|MPLAY|MSTOP|MNEXT|     | KP+ | KP- | END | PGDN| DOWN|        |      |
+// |        |     |        |                                   |        |     |        |
+// ---------------------------------------------------------------------------------------------
+            bindings = <
+&kp K_POWER &kp F1 &kp F2 &kp F3 &kp F4 &kp F5 &kp F6 &kp F7 &kp F8 &kp F9 &kp F10 &kp F11 &kp F12 &kp INS &kp DEL
+&kp CAPS    &bt BT_SEL 0 &bt BT_SEL 1 &bt BT_SEL 2 &bt BT_SEL 3 &bt BT_SEL 4 &bt BT_CLR &bootloader &kp PSCRN &kp SLCK &kp PAUSE_BREAK &kp UP &sys_reset &kp KP_NUM
+&trans      &kp C_VOL_DN &kp C_VOL_UP &kp C_MUTE &kp C_EJECT &trans &kp KP_MULTIPLY &kp KP_DIVIDE &kp HOME &kp PG_UP &kp LEFT &kp RIGHT &kp KP_ENTER
+&trans      &kp C_PREV &kp C_PP &kp C_STOP &kp C_NEXT &trans &kp KP_PLUS &kp KP_MINUS &kp END &kp PG_DN &kp DOWN &trans &trans
+&trans      &trans &trans &trans &trans
+            >;
+        };
+    };
+};
