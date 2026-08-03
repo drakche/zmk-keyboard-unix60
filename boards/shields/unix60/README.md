@@ -5,12 +5,34 @@ HHKB-layout PCB that takes a Pro Micro footprint controller.
 
 ## Building
 
-```bash
-# Both firmware files are built by GitHub Actions on push; see build.yaml.
-```
+Firmware is built by GitHub Actions on every push (see `build.yaml`); there is
+no local Zephyr toolchain in this repo.
 
-Two build entries are defined: `unix60` and `unix60_studio` (the latter adds
-ZMK Studio, which lets you remap keys at runtime without recompiling).
+1. Open the **Actions** tab of this repository and pick the workflow run for
+   the commit you want (or the latest run on `main`).
+2. Once it finishes, download the `firmware` artifact from the run summary
+   and unzip it. It contains two files:
+   - `unix60-nice_nano_v2-zmk.uf2` — the plain firmware (`build.yaml`'s
+     `unix60` entry).
+   - `unix60_studio.uf2` — the same firmware plus [ZMK
+     Studio](https://zmk.dev/docs/features/studio) support (`build.yaml`'s
+     `unix60_studio` entry, named via its `artifact-name`), which lets you
+     remap keys at runtime without recompiling. Flash this one if you want to
+     use Studio; otherwise the plain build is smaller and simpler.
+3. Put the controller into bootloader mode: double-tap its reset button. A
+   drive named `NICENANO` will mount on your computer.
+4. Drag the `.uf2` file you chose onto the `NICENANO` drive. It flashes and
+   reboots automatically once the copy finishes.
+
+### Key reference (Fn layer)
+
+| Keys | Action |
+| --- | --- |
+| `Fn` + `Q`…`T` | Select Bluetooth profile 0-4 |
+| `Fn` + `Y` | Clear the current Bluetooth profile |
+| `Fn` + `U` | Enter the bootloader |
+| `Fn` + `]` | Soft reset |
+| `Fn` + `B` | Unlock ZMK Studio (only needed on the `unix60_studio` build) |
 
 ## Hardware
 
@@ -32,6 +54,30 @@ alternate-layout switch positions, left unmapped on purpose:
 | `RC(1,5)` | 2u backspace, instead of split `\` + `` ` `` |
 | `RC(4,6)` | ISO `#` |
 | `RC(5,0)` | split left shift / ISO backslash |
+
+## Keymap
+
+`unix60.keymap` defines two layers, named `Base` and `Fn` (the names ZMK
+Studio shows). Both are ported 1:1 from `unix60.json` (the QMK Configurator
+export in the repo root); the only additions are the Bluetooth, bootloader,
+reset and Studio-unlock keys, which occupy slots the export left blank.
+
+**Base layer:**
+
+![Base layer](images/base-layer.svg)
+
+**Fn layer** (hold `Fn`, the bottom-right key on the Base layer):
+
+![Fn layer](images/fn-layer.svg)
+
+The images are generated from the shield's own devicetree files (geometry
+from `unix60-layouts.dtsi`, bindings from `unix60.keymap`), so they cannot
+drift out of sync with the actual keymap. Regenerate them after editing the
+keymap with:
+
+```bash
+python3 tools/render_keymap.py
+```
 
 ## Physical layout
 
@@ -58,8 +104,19 @@ removing R10 on the controller fixes it at no cost.
 ## Provenance
 
 - Matrix pins, diode direction and per-key matrix positions: QMK
-  `keyboards/fr4/unix60/keyboard.json`.
+  `keyboards/fr4/unix60/keyboard.json`, vendored byte-identical at the repo
+  root as `unix60-keyboard.json`
+  ([source](https://raw.githubusercontent.com/qmk/qmk_firmware/master/keyboards/fr4/unix60/keyboard.json),
+  from the GPL-2.0-licensed
+  [qmk_firmware](https://github.com/qmk/qmk_firmware) repository). The
+  matrix-to-Pro-Micro-pin translation is the standard ATmega32U4 Pro Micro
+  pinout, not project-specific.
 - Keymap: `unix60.json` in the repo root, a QMK Configurator export for
   `LAYOUT_60_hhkb`.
-- Run `python3 tools/validate_shield.py` from the repo root to check the shield
-  files still agree with both sources.
+- Run `python3 tools/validate_shield.py` from the repo root to check the
+  shield files still agree with both sources. It derives the expected matrix
+  map and physical-layout geometry directly from `unix60-keyboard.json` and
+  compares them index-for-index against `unix60.overlay` and
+  `unix60-layouts.dtsi` — a transposed matrix position or a drifted key
+  coordinate fails the comparison even though it would otherwise look like a
+  perfectly well-formed layout.

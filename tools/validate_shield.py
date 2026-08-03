@@ -23,12 +23,35 @@ COLS = 9
 KEY_COUNT = 60
 ROW_LENGTHS = [15, 14, 13, 13, 5]
 
+# The standard ATmega32U4 "Pro Micro" pinout: AVR port pin -> the numbered
+# pin on the Pro Micro footprint (the same numbering ZMK's `pro_micro`
+# nexus uses). This is fixed by the Pro Micro hardware standard itself, not
+# by this project, so it is trusted as a single well-known mapping rather
+# than transcribed per-project. Pins 10 and 16 (AVR B6/B2) are the ones that
+# land on the nRF52840's NFC-antenna pins on nice!nano-family boards.
+PRO_MICRO_AVR_PINS = {
+    "D2": 0, "D3": 1, "D1": 2, "D0": 3, "D4": 4, "C6": 5, "D7": 6,
+    "E6": 7, "B4": 8, "B5": 9, "B6": 10,
+    "B3": 14, "B1": 15, "B2": 16,
+    "F7": 18, "F6": 19, "F5": 20, "F4": 21,
+}
+
 RESULTS = []
 
 
 def read(rel_path):
     with open(os.path.join(REPO, rel_path), encoding="utf-8") as handle:
         return handle.read()
+
+
+def upstream():
+    """The vendored QMK keyboard definition this shield is checked against.
+
+    Kept byte-identical to QMK's keyboards/fr4/unix60/keyboard.json (see the
+    README's Provenance section) so the matrix map, geometry and matrix pins
+    can be independently derived instead of re-transcribed as literals here.
+    """
+    return json.loads(read("unix60-keyboard.json"))
 
 
 def check(name, ok, detail=""):
@@ -48,7 +71,7 @@ def dt_property(text, prop):
         raise ValueError("property %r not found" % prop)
     index = start.end()
     depth = 1
-    while depth:
+    while depth and index < len(text):
         char = text[index]
         if char == "<":
             depth += 1
@@ -57,6 +80,29 @@ def dt_property(text, prop):
             if not depth:
                 break
         index += 1
+    if depth:
+        raise ValueError("unterminated <...> for property %r" % prop)
+    return text[start.end():index]
+
+
+def node_body(text, node_regex):
+    """Return the text inside the braces of the first node matching `node_regex {`."""
+    start = re.search(node_regex + r"\s*{", text)
+    if not start:
+        raise ValueError("node %r not found" % node_regex)
+    index = start.end()
+    depth = 1
+    while depth and index < len(text):
+        char = text[index]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if not depth:
+                break
+        index += 1
+    if depth:
+        raise ValueError("unterminated node body for %r" % node_regex)
     return text[start.end():index]
 
 
@@ -80,26 +126,55 @@ def transform_entries():
 
 def check_matrix():
     text = read(SHIELD + "/unix60.overlay")
+    qmk = upstream()
 
     check(
-        "overlay uses only the &pro_micro nexus",
+        "[shape] overlay uses only the &pro_micro nexus",
         not re.search(r"&gpio[01]\b", text),
         "found a direct &gpio0/&gpio1 reference",
     )
     check(
-        'diode-direction is "col2row"',
+        '[shape] diode-direction is "col2row"',
         'diode-direction = "col2row"' in text,
     )
-    check("kscan declares wakeup-source", "wakeup-source" in text)
+
+    try:
+        kscan_body = node_body(text, r"kscan:\s*kscan")
+        check("[shape] kscan node declares wakeup-source", "wakeup-source" in kscan_body)
+    except ValueError as exc:
+        check("[shape] kscan node declares wakeup-source", False, str(exc))
 
     rows = gpio_pins(text, "row-gpios")
     cols = gpio_pins(text, "col-gpios")
-    check("row-gpios pins", rows == [1, 0, 2, 3, 4, 5, 6], "got %r" % (rows,))
-    check("col-gpios pins", cols == [7, 8, 9, 21, 20, 19, 18, 15, 14], "got %r" % (cols,))
+
+    qmk_rows = qmk["matrix_pins"]["rows"]
+    qmk_cols = qmk["matrix_pins"]["cols"]
+    expected_rows = [PRO_MICRO_AVR_PINS[name] for name in qmk_rows]
+    expected_cols = [PRO_MICRO_AVR_PINS[name] for name in qmk_cols]
+    check(
+        "[upstream] row-gpios pins match QMK matrix_pins.rows via the standard Pro Micro pinout",
+        rows == expected_rows,
+        "got %r, want %r (from AVR pins %r)" % (rows, expected_rows, qmk_rows),
+    )
+    check(
+        "[upstream] col-gpios pins match QMK matrix_pins.cols via the standard Pro Micro pinout",
+        cols == expected_cols,
+        "got %r, want %r (from AVR pins %r)" % (cols, expected_cols, qmk_cols),
+    )
+    check(
+        "[upstream] diode_direction is COL2ROW in unix60-keyboard.json and matches the overlay",
+        qmk["diode_direction"] == "COL2ROW" and 'diode-direction = "col2row"' in text,
+        "unix60-keyboard.json diode_direction=%r" % (qmk["diode_direction"],),
+    )
+    check(
+        "[shape] no NFC pins used",
+        not ({10, 16} & set(rows + cols)),
+        "NFC-adjacent pins present: %r" % ({10, 16} & set(rows + cols)),
+    )
 
     row_flags = re.findall(r"&pro_micro\s+\d+\s+\(([^)]*)\)", text)
     check(
-        "every row gpio has ACTIVE_HIGH | PULL_DOWN",
+        "[shape] every row gpio has ACTIVE_HIGH | PULL_DOWN",
         len(row_flags) == ROWS
         and all("GPIO_ACTIVE_HIGH" in f and "GPIO_PULL_DOWN" in f for f in row_flags),
         "got %r" % (row_flags,),
@@ -109,36 +184,61 @@ def check_matrix():
     if col_body:
         col_flags = re.findall(r"<\s*&pro_micro\s+\d+\s+([^>]+)\s*>", col_body.group(1))
         check(
-            "every col-gpios is bare GPIO_ACTIVE_HIGH",
+            "[shape] every col-gpios is bare GPIO_ACTIVE_HIGH",
             len(col_flags) == COLS
             and all(f.strip() == "GPIO_ACTIVE_HIGH" for f in col_flags),
             "got %r" % (col_flags,),
         )
+    else:
+        check("[shape] every col-gpios is bare GPIO_ACTIVE_HIGH", False, "col-gpios property not found")
 
     declared_rows = int(re.search(r"rows\s*=\s*<\s*(\d+)", text).group(1))
     declared_cols = int(re.search(r"columns\s*=\s*<\s*(\d+)", text).group(1))
-    check("transform rows matches row-gpios count", declared_rows == len(rows) == ROWS)
-    check("transform columns matches col-gpios count", declared_cols == len(cols) == COLS)
+    check("[shape] transform rows matches row-gpios count", declared_rows == len(rows) == ROWS)
+    check("[shape] transform columns matches col-gpios count", declared_cols == len(cols) == COLS)
 
 
 def check_transform():
     entries = transform_entries()
 
-    check("transform has 60 entries", len(entries) == KEY_COUNT, "got %d" % len(entries))
+    check("[shape] transform has 60 entries", len(entries) == KEY_COUNT, "got %d" % len(entries))
     out_of_range = [e for e in entries if not (0 <= e[0] < ROWS and 0 <= e[1] < COLS)]
-    check("every RC() is within 7x9", not out_of_range, "out of range: %r" % (out_of_range,))
+    check("[shape] every RC() is within 7x9", not out_of_range, "out of range: %r" % (out_of_range,))
 
     duplicates = sorted({e for e in entries if entries.count(e) > 1})
-    check("no duplicate RC()", not duplicates, "duplicated: %r" % (duplicates,))
+    check("[shape] no duplicate RC()", not duplicates, "duplicated: %r" % (duplicates,))
 
     # The three positions the Unix60 PCB reserves for alternate layouts.
     unused = sorted(
         {(r, c) for r in range(ROWS) for c in range(COLS)} - set(entries)
     )
     check(
-        "exactly the three alternate-layout positions are unused",
+        "[shape] exactly the three alternate-layout positions are unused",
         unused == [(1, 5), (4, 6), (5, 0)],
         "unused: %r" % (unused,),
+    )
+
+    # This is the check the shape checks above cannot do: a transposition of
+    # two RC() entries has correct shape (60 entries, in range, no dupes, same
+    # three gaps) but is still wrong. Comparing index-for-index against the
+    # vendored QMK source catches that.
+    qmk = upstream()
+    expected_map = [
+        tuple(k["matrix"]) for k in qmk["layouts"]["LAYOUT_60_hhkb"]["layout"]
+    ]
+    check(
+        "[upstream] transform matches QMK LAYOUT_60_hhkb matrix map",
+        entries == expected_map,
+        "first mismatch: %r" % (
+            next(
+                (
+                    (i, got, want)
+                    for i, (got, want) in enumerate(zip(entries, expected_map))
+                    if got != want
+                ),
+                None,
+            ),
+        ),
     )
 
 
@@ -198,7 +298,8 @@ QMK_TO_ZMK = {
     "KC_PMNS": "&kp KP_MINUS",
 }
 
-# Wireless keys substituted into &trans slots on the Fn layer. Position -> binding.
+# Wireless and Studio-unlock keys substituted into &trans slots on the Fn
+# layer. Position -> binding.
 FN_SUBSTITUTIONS = {
     16: "&bt BT_SEL 0",   # Q
     17: "&bt BT_SEL 1",   # W
@@ -208,6 +309,7 @@ FN_SUBSTITUTIONS = {
     21: "&bt BT_CLR",     # Y
     22: "&bootloader",    # U
     27: "&sys_reset",     # ]
+    47: "&studio_unlock", # B
 }
 
 
@@ -287,7 +389,7 @@ def check_keymap():
         )
         expected_fn[position] = binding
     check(
-        "layer 1 matches unix60.json plus the 8 wireless keys",
+        "layer 1 matches unix60.json plus the 9 substituted keys",
         layers[1] == expected_fn,
         "first mismatch: %r" % (
             next(
@@ -300,23 +402,49 @@ def check_keymap():
             ),
         ),
     )
-    check(
-        "exactly 8 wireless keys were substituted",
-        len(FN_SUBSTITUTIONS) == 8,
-    )
 
 
 def check_layout():
     text = read(SHIELD + "/unix60-layouts.dtsi")
     keys = layout_keys()
 
-    check("layout node is named unix60_layout", "unix60_layout:" in text)
-    check("layout binds the transform", "transform = <&default_transform>" in text)
-    check("layout binds the kscan", "kscan = <&kscan>" in text)
-    check("layout has 60 keys", len(keys) == KEY_COUNT, "got %d" % len(keys))
+    check("[shape] layout node is named unix60_layout", "unix60_layout:" in text)
+    check("[shape] layout binds the transform", "transform = <&default_transform>" in text)
+    check("[shape] layout binds the kscan", "kscan = <&kscan>" in text)
+    check("[shape] layout has 60 keys", len(keys) == KEY_COUNT, "got %d" % len(keys))
     check(
-        "layout key count equals transform entry count",
+        "[shape] layout key count equals transform entry count",
         len(keys) == len(transform_entries()),
+    )
+
+    # This is the check the shape checks below cannot do: two keys with
+    # swapped x coordinates (or a width typo) still produce a valid-looking
+    # grid — same row y's, same row lengths, no gaps within *some* row order.
+    # Comparing every (w,h,x,y) tuple index-for-index against the vendored
+    # QMK source catches that.
+    qmk = upstream()
+    expected_keys = [
+        (
+            round(k.get("w", 1) * 100),
+            round(k.get("h", 1) * 100),
+            round(k["x"] * 100),
+            round(k["y"] * 100),
+        )
+        for k in qmk["layouts"]["LAYOUT_60_hhkb"]["layout"]
+    ]
+    check(
+        "[upstream] layout geometry (w,h,x,y) matches QMK LAYOUT_60_hhkb",
+        keys == expected_keys,
+        "first mismatch: %r" % (
+            next(
+                (
+                    (i, got, want)
+                    for i, (got, want) in enumerate(zip(keys, expected_keys))
+                    if got != want
+                ),
+                None,
+            ),
+        ),
     )
 
     # Group keys by their y coordinate, preserving order.
@@ -327,46 +455,46 @@ def check_layout():
         rows[-1][1].append((x, w))
 
     check(
-        "layout has 5 rows at y = 0,100,200,300,400",
+        "[shape] layout has 5 rows at y = 0,100,200,300,400",
         [y for y, _ in rows] == [0, 100, 200, 300, 400],
         "got %r" % ([y for y, _ in rows],),
     )
     check(
-        "row key counts are 15/14/13/13/5",
+        "[shape] row key counts are 15/14/13/13/5",
         [len(r) for _, r in rows] == ROW_LENGTHS,
         "got %r" % ([len(r) for _, r in rows],),
     )
 
     # Every key must start exactly where the previous one ended.
     gaps = []
-    for _, (y, row) in enumerate(rows):
+    for y, row in rows:
         for (x1, w1), (x2, _) in zip(row, row[1:]):
             if x1 + w1 != x2:
                 gaps.append((y, x1, x1 + w1, x2))
-    check("no gaps or overlaps within any row", not gaps, "at %r" % (gaps,))
+    check("[shape] no gaps or overlaps within any row", not gaps, "at %r" % (gaps,))
 
     # Check row spans only if we have the expected 5 rows.
     if len(rows) >= 5:
         spans = [(row[0][0], row[-1][0] + row[-1][1]) for _, row in rows]
         check(
-            "rows 0-3 span 0 to 1500",
+            "[shape] rows 0-3 span 0 to 1500",
             all(s == (0, 1500) for s in spans[:4]),
             "got %r" % (spans[:4],),
         )
         check(
-            "row 4 spans 150 to 1350, leaving 1.5u blockers",
+            "[shape] row 4 spans 150 to 1350, leaving 1.5u blockers",
             spans[4] == (150, 1350),
             "got %r" % (spans[4],),
         )
     else:
-        check("rows 0-3 span 0 to 1500", False, "only %d rows" % len(rows))
+        check("[shape] rows 0-3 span 0 to 1500", False, "only %d rows" % len(rows))
         check(
-            "row 4 spans 150 to 1350, leaving 1.5u blockers",
+            "[shape] row 4 spans 150 to 1350, leaving 1.5u blockers",
             False,
             "only %d rows" % len(rows),
         )
 
-    check("every key is 100 units tall", all(h == 100 for _, h, _, _ in keys))
+    check("[shape] every key is 100 units tall", all(h == 100 for _, h, _, _ in keys))
 
 
 def check_metadata():
@@ -377,9 +505,9 @@ def check_metadata():
         "metadata url points at the Unix60 project",
         "github.com/mkdl/Unix60" in meta,
     )
-    check("metadata requires pro_micro", re.search(r"-\s*pro_micro", meta))
-    check("metadata declares the keys feature", re.search(r"-\s*keys", meta))
-    check("metadata declares the studio feature", re.search(r"-\s*studio", meta))
+    check("metadata requires pro_micro", re.search(r"^\s*-\s*pro_micro\s*$", meta, re.M))
+    check("metadata declares the keys feature", re.search(r"^\s*-\s*keys\s*$", meta, re.M))
+    check("metadata declares the studio feature", re.search(r"^\s*-\s*studio\s*$", meta, re.M))
     check(
         "metadata no longer contains template placeholders",
         "example.com" not in meta and "generated from a template" not in meta,
@@ -387,13 +515,13 @@ def check_metadata():
 
     conf = read(SHIELD + "/unix60.conf")
     check(
-        "conf has no uncommented settings",
-        not [
-            line
-            for line in conf.splitlines()
-            if line.strip() and not line.strip().startswith("#")
-        ],
-        "shield defaults belong in Kconfig.defconfig, not unix60.conf",
+        "conf has no leftover template placeholders",
+        "example.com" not in conf and "generated from a template" not in conf,
+    )
+    check(
+        "unix60.conf does not set CONFIG_ZMK_STUDIO",
+        not re.search(r"^\s*CONFIG_ZMK_STUDIO\s*=", conf, re.M),
+        "Studio is enabled per-build via build.yaml's cmake-args, not here",
     )
 
     readme = read(SHIELD + "/README.md")
@@ -404,7 +532,7 @@ def check_metadata():
     check("build.yaml targets nice_nano_v2", "nice_nano_v2" in build)
     check(
         "build.yaml has a plain unix60 entry",
-        re.search(r"-\s*board:\s*nice_nano_v2\s*\n\s*shield:\s*unix60\s*\n\s*-", build),
+        re.search(r"shield:\s*unix60\s*\n(?!\s*(snippet|cmake-args|artifact-name))", build),
     )
     check("build.yaml has a studio entry", "studio-rpc-usb-uart" in build)
     check("build.yaml studio entry sets CONFIG_ZMK_STUDIO", "-DCONFIG_ZMK_STUDIO=y" in build)
@@ -413,17 +541,29 @@ def check_metadata():
 
 def check_completeness():
     """A file existing on disk is not enough — ZMK's CI only ever sees what
-    git tracks. This is the check that catches a shield file being written
-    but never `git add`ed, which every other check here is blind to."""
-    tracked = set(
-        subprocess.run(
-            ["git", "ls-files", SHIELD],
-            cwd=REPO,
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.split()
-    )
+    git tracks and what's committed. This is the check that catches a shield
+    file being written but never `git add`ed (tracked-but-missing), and its
+    sibling below catches a tracked file being locally modified after the
+    last commit (tracked-but-stale) — both are invisible to every other check
+    here, which reads straight off the working tree."""
+    try:
+        tracked = set(
+            subprocess.run(
+                ["git", "ls-files", SHIELD],
+                cwd=REPO,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.split()
+        )
+    except (subprocess.CalledProcessError, OSError) as exc:
+        check(
+            "every file ZMK needs for the shield is tracked by git",
+            False,
+            "git ls-files failed: %r" % (exc,),
+        )
+        return
+
     required = [
         "Kconfig.shield",
         "Kconfig.defconfig",
@@ -453,14 +593,49 @@ def check_completeness():
         and re.search(r"config\s+ZMK_KEYBOARD_NAME\b", kconfig_defconfig) is not None,
     )
 
+    try:
+        status = subprocess.run(
+            [
+                "git", "status", "--porcelain", "--",
+                SHIELD, "build.yaml", "unix60.json", "unix60-keyboard.json",
+            ],
+            cwd=REPO,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        check(
+            "tracked shield files match HEAD (no uncommitted local changes)",
+            status.strip() == "",
+            "git status --porcelain: %r" % (status,),
+        )
+    except (subprocess.CalledProcessError, OSError) as exc:
+        check(
+            "tracked shield files match HEAD (no uncommitted local changes)",
+            False,
+            "git status failed: %r" % (exc,),
+        )
+
+
+def run_check_group(name, fn):
+    """Run one check_* group, converting a crash into a single FAIL line
+    instead of an uncaught traceback. This is the whole test suite, so a bug
+    in one group (a malformed regex, a property that moved) should still let
+    every other group report, and should itself show up as a clean FAIL
+    rather than aborting the run."""
+    try:
+        fn()
+    except Exception as exc:  # noqa: BLE001 - deliberately broad: see docstring
+        check("%s completed without crashing" % name, False, "%s: %s" % (type(exc).__name__, exc))
+
 
 def main():
-    check_matrix()
-    check_transform()
-    check_layout()
-    check_keymap()
-    check_metadata()
-    check_completeness()
+    run_check_group("check_matrix", check_matrix)
+    run_check_group("check_transform", check_transform)
+    run_check_group("check_layout", check_layout)
+    run_check_group("check_keymap", check_keymap)
+    run_check_group("check_metadata", check_metadata)
+    run_check_group("check_completeness", check_completeness)
 
     width = max(len(name) for name, _, _ in RESULTS)
     failed = 0

@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  *
  * Ported 1:1 from unix60.json (QMK Configurator export, LAYOUT_60_hhkb).
- * The only additions are the Bluetooth, bootloader and reset keys, which
- * occupy slots the export left as KC_TRNS.
+ * The only additions are the Bluetooth, bootloader, reset and ZMK Studio
+ * unlock keys, which occupy slots the export left as KC_TRNS.
  */
 
 #include <behaviors.dtsi>
@@ -17,6 +17,7 @@
         compatible = "zmk,keymap";
 
         default_layer {
+            display-name = "Base";
 // ---------------------------------------------------------------------------------------------
 // | ESC |  1  |  2  |  3  |  4  |  5  |  6  |  7  |  8  |  9  |  0  |  -  |  =  |  \  |  `  |
 // |  TAB   |  Q  |  W  |  E  |  R  |  T  |  Y  |  U  |  I  |  O  |  P  |  [  |  ]  |  BSPC  |
@@ -34,18 +35,19 @@
         };
 
         fn_layer {
+            display-name = "Fn";
 // ---------------------------------------------------------------------------------------------
 // | PWR | F1  | F2  | F3  | F4  | F5  | F6  | F7  | F8  | F9  | F10 | F11 | F12 | INS | DEL |
 // |  CAPS  | BT0 | BT1 | BT2 | BT3 | BT4 |BTCLR| BOOT| PSCR| SCRL|PAUSE|  UP |RESET|  NUM   |
 // |          | VOLD| VOLU| MUTE| EJCT|     | KP* | KP/ | HOME| PGUP| LEFT|RIGHT|   KPENT    |
-// |             |MPREV|MPLAY|MSTOP|MNEXT|     | KP+ | KP- | END | PGDN| DOWN|        |      |
+// |             |MPREV|MPLAY|MSTOP|MNEXT|STUDO| KP+ | KP- | END | PGDN| DOWN|        |      |
 // |        |     |        |                                   |        |     |        |
 // ---------------------------------------------------------------------------------------------
             bindings = <
 &kp K_POWER &kp F1 &kp F2 &kp F3 &kp F4 &kp F5 &kp F6 &kp F7 &kp F8 &kp F9 &kp F10 &kp F11 &kp F12 &kp INS &kp DEL
 &kp CAPS    &bt BT_SEL 0 &bt BT_SEL 1 &bt BT_SEL 2 &bt BT_SEL 3 &bt BT_SEL 4 &bt BT_CLR &bootloader &kp PSCRN &kp SLCK &kp PAUSE_BREAK &kp UP &sys_reset &kp KP_NUM
 &trans      &kp C_VOL_DN &kp C_VOL_UP &kp C_MUTE &kp C_EJECT &trans &kp KP_MULTIPLY &kp KP_DIVIDE &kp HOME &kp PG_UP &kp LEFT &kp RIGHT &kp KP_ENTER
-&trans      &kp C_PREV &kp C_PP &kp C_STOP &kp C_NEXT &trans &kp KP_PLUS &kp KP_MINUS &kp END &kp PG_DN &kp DOWN &trans &trans
+&trans      &kp C_PREV &kp C_PP &kp C_STOP &kp C_NEXT &studio_unlock &kp KP_PLUS &kp KP_MINUS &kp END &kp PG_DN &kp DOWN &trans &trans
 &trans      &trans &trans &trans &trans
             >;
         };
