@@ -18,7 +18,9 @@
 - Exactly 60 keys. Rows contain 15 / 14 / 13 / 13 / 5 keys.
 - `Kconfig.shield` and `Kconfig.defconfig` are already correct. **Do not modify them.**
 - Validator must use only the Python 3 standard library. No pip installs.
-- Work on branch `unix60-shield`. Do not merge to `main`.
+- Work directly on `main` and push to `origin main`. The user explicitly
+  authorised this for this piece of work, overriding the usual branch-first
+  rule, because the repo is new and has no other contributors.
 - Every commit message ends with `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`.
 
 ---
@@ -1068,7 +1070,7 @@ EOF
 - [ ] **Step 3: Push the branch**
 
 ```bash
-git push -u origin unix60-shield
+git push origin main
 ```
 
 The user has authorised this push. The repo's
@@ -1078,8 +1080,8 @@ entries.
 - [ ] **Step 4: Watch the run**
 
 ```bash
-gh run list --branch unix60-shield --limit 1
-gh run watch "$(gh run list --branch unix60-shield --limit 1 --json databaseId --jq '.[0].databaseId')" --exit-status
+gh run list --branch main --limit 1
+gh run watch "$(gh run list --branch main --limit 1 --json databaseId --jq '.[0].databaseId')" --exit-status
 ```
 
 If `gh` is unavailable, poll instead:
@@ -1096,7 +1098,7 @@ artifacts.
 Fetch the failing log:
 
 ```bash
-gh run view "$(gh run list --branch unix60-shield --limit 1 --json databaseId --jq '.[0].databaseId')" --log-failed
+gh run view "$(gh run list --branch main --limit 1 --json databaseId --jq '.[0].databaseId')" --log-failed
 ```
 
 Devicetree errors most likely to appear here, and what they mean:
