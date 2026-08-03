@@ -1,0 +1,6 @@
+if SHIELD_UNIX60
+
+config ZMK_KEYBOARD_NAME
+    default "Unix60"
+
+endif # SHIELD_UNIX60

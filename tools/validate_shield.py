@@ -12,6 +12,7 @@ Run from the repo root:  python3 tools/validate_shield.py
 import json
 import os
 import re
+import subprocess
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -410,12 +411,56 @@ def check_metadata():
     check("build.yaml names the studio artifact", "artifact-name: unix60_studio" in build)
 
 
+def check_completeness():
+    """A file existing on disk is not enough — ZMK's CI only ever sees what
+    git tracks. This is the check that catches a shield file being written
+    but never `git add`ed, which every other check here is blind to."""
+    tracked = set(
+        subprocess.run(
+            ["git", "ls-files", SHIELD],
+            cwd=REPO,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.split()
+    )
+    required = [
+        "Kconfig.shield",
+        "Kconfig.defconfig",
+        "unix60.overlay",
+        "unix60-layouts.dtsi",
+        "unix60.keymap",
+        "unix60.conf",
+        "unix60.zmk.yml",
+    ]
+    missing = [name for name in required if SHIELD + "/" + name not in tracked]
+    check(
+        "every file ZMK needs for the shield is tracked by git",
+        not missing,
+        "untracked: %r" % (missing,),
+    )
+
+    kconfig_shield = read(SHIELD + "/Kconfig.shield")
+    check(
+        "Kconfig.shield defines SHIELD_UNIX60",
+        re.search(r"config\s+SHIELD_UNIX60\b", kconfig_shield) is not None,
+    )
+
+    kconfig_defconfig = read(SHIELD + "/Kconfig.defconfig")
+    check(
+        "Kconfig.defconfig sets ZMK_KEYBOARD_NAME guarded by if SHIELD_UNIX60",
+        re.search(r"if\s+SHIELD_UNIX60\b", kconfig_defconfig) is not None
+        and re.search(r"config\s+ZMK_KEYBOARD_NAME\b", kconfig_defconfig) is not None,
+    )
+
+
 def main():
     check_matrix()
     check_transform()
     check_layout()
     check_keymap()
     check_metadata()
+    check_completeness()
 
     width = max(len(name) for name, _, _ in RESULTS)
     failed = 0

@@ -1,5 +1,8 @@
 
 .zmk/
 
+# Python bytecode cache
+__pycache__/
+
 # Subagent-driven-development scratch workspace (ledgers, briefs, review packages)
 .superpowers/
