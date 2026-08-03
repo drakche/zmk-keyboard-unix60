@@ -368,11 +368,54 @@ def check_layout():
     check("every key is 100 units tall", all(h == 100 for _, h, _, _ in keys))
 
 
+def check_metadata():
+    meta = read(SHIELD + "/unix60.zmk.yml")
+    check("metadata id is unix60", re.search(r"^id:\s*unix60\s*$", meta, re.M))
+    check("metadata type is shield", re.search(r"^type:\s*shield\s*$", meta, re.M))
+    check(
+        "metadata url points at the Unix60 project",
+        "github.com/mkdl/Unix60" in meta,
+    )
+    check("metadata requires pro_micro", re.search(r"-\s*pro_micro", meta))
+    check("metadata declares the keys feature", re.search(r"-\s*keys", meta))
+    check("metadata declares the studio feature", re.search(r"-\s*studio", meta))
+    check(
+        "metadata no longer contains template placeholders",
+        "example.com" not in meta and "generated from a template" not in meta,
+    )
+
+    conf = read(SHIELD + "/unix60.conf")
+    check(
+        "conf has no uncommented settings",
+        not [
+            line
+            for line in conf.splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        ],
+        "shield defaults belong in Kconfig.defconfig, not unix60.conf",
+    )
+
+    readme = read(SHIELD + "/README.md")
+    for topic in ("pro_micro", "col2row", "P0.24", "RC(1,5)"):
+        check("README documents %s" % topic, topic in readme)
+
+    build = read("build.yaml")
+    check("build.yaml targets nice_nano_v2", "nice_nano_v2" in build)
+    check(
+        "build.yaml has a plain unix60 entry",
+        re.search(r"-\s*board:\s*nice_nano_v2\s*\n\s*shield:\s*unix60\s*\n\s*-", build),
+    )
+    check("build.yaml has a studio entry", "studio-rpc-usb-uart" in build)
+    check("build.yaml studio entry sets CONFIG_ZMK_STUDIO", "-DCONFIG_ZMK_STUDIO=y" in build)
+    check("build.yaml names the studio artifact", "artifact-name: unix60_studio" in build)
+
+
 def main():
     check_matrix()
     check_transform()
     check_layout()
     check_keymap()
+    check_metadata()
 
     width = max(len(name) for name, _, _ in RESULTS)
     failed = 0
