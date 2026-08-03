@@ -1,4 +1,4 @@
-# zmk-keyboard-unix60
+# zmk-config-unix60
 
 ZMK firmware for the [FR4Boards Unix60](https://github.com/mkdl/Unix60), a 60%
 PCB in the true HHKB layout: a split backspace (`\` and `` ` `` as two 1u keys
@@ -19,13 +19,18 @@ Three names are in play, and they are deliberately different:
 
 | | Value | Where it appears |
 | --- | --- | --- |
-| Repository | `zmk-keyboard-unix60` | the GitHub URL |
+| Repository | `zmk-config-unix60` | the GitHub URL |
 | Module | `zmk-keyboard-unix60` | `name:` in `zephyr/module.yml` |
 | Shield | `unix60` | `-DSHIELD=unix60`, and every filename under `boards/shields/unix60/` |
 
-The module name follows ZMK's [`zmk-<type>-<description>`
-convention](https://zmk.dev/docs/development/module-creation). The shield name is
-the short one you pass to the build.
+The repository name follows the community `zmk-config-*` convention for a ZMK
+user config. The module name follows the separate
+[`zmk-<type>-<description>`](https://zmk.dev/docs/development/module-creation)
+convention for modules, whose valid types are `keyboard`, `component`,
+`behavior`, `driver`, `feature` and `vfx` — `config` is not among them, which is
+why these two names differ. The ZMK docs allow that explicitly: "your module name
+does not have to be the same as your repository name." The shield name is the
+short one you pass to the build.
 
 ### Using this from your own config
 
@@ -37,7 +42,7 @@ instead of cloning this one — add it to your `config/west.yml`:
     - name: drakche
       url-base: https://github.com/drakche
   projects:
-    - name: zmk-keyboard-unix60
+    - name: zmk-config-unix60
       remote: drakche
       revision: main
 ```
