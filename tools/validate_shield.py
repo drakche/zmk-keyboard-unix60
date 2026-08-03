@@ -101,6 +101,16 @@ def check_matrix():
         "got %r" % (row_flags,),
     )
 
+    col_body = re.search(r"col-gpios\s*=\s*(.*?);", text, re.S)
+    if col_body:
+        col_flags = re.findall(r"<\s*&pro_micro\s+\d+\s+([^>]+)\s*>", col_body.group(1))
+        check(
+            "every col-gpios is bare GPIO_ACTIVE_HIGH",
+            len(col_flags) == COLS
+            and all(f.strip() == "GPIO_ACTIVE_HIGH" for f in col_flags),
+            "got %r" % (col_flags,),
+        )
+
     declared_rows = int(re.search(r"rows\s*=\s*<\s*(\d+)", text).group(1))
     declared_cols = int(re.search(r"columns\s*=\s*<\s*(\d+)", text).group(1))
     check("transform rows matches row-gpios count", declared_rows == len(rows) == ROWS)
