@@ -26,4 +26,11 @@ include:
     snippet: studio-rpc-usb-uart
     cmake-args: -DCONFIG_ZMK_STUDIO=y
     artifact-name: unix60_studio
+  # Diagnostic build for a hand-assembled board with reversed diodes. Only
+  # flash this if the plain build scans no keys and you have confirmed the
+  # diode polarity is backwards. See snippets/unix60-row2col/.
+  - board: nice_nano_v2
+    shield: unix60
+    snippet: unix60-row2col
+    artifact-name: unix60_row2col
 

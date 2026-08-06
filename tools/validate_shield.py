@@ -658,6 +658,124 @@ def check_images():
         )
 
 
+SNIPPET = "snippets/unix60-row2col"
+
+
+def gpio_entries(text, prop):
+    """Return (pin, flag_text) pairs for a *-gpios property, in order."""
+    body = re.search(re.escape(prop) + r"\s*=\s*(.*?);", text, re.S)
+    if not body:
+        raise ValueError("property %r not found" % prop)
+    return [
+        (int(pin), flags.strip())
+        for pin, flags in re.findall(
+            r"&pro_micro\s+(\d+)\s+([^>]*)", body.group(1)
+        )
+    ]
+
+
+def check_row2col_snippet():
+    """The row2col snippet must restate the pin lists to swap the GPIO flags,
+    so the pins exist in two places. This is the check that stops them
+    drifting: the snippet's pins must equal the base shield's exactly, in the
+    same order, with only the flags and the scan direction inverted."""
+    try:
+        overlay = read(SNIPPET + "/unix60-row2col.overlay")
+        meta = read(SNIPPET + "/snippet.yml")
+    except (OSError, IOError) as exc:
+        check("[shape] row2col snippet files exist", False, "%r" % (exc,))
+        return
+
+    check("[shape] row2col snippet files exist", True)
+    check(
+        "[shape] snippet.yml declares name unix60-row2col",
+        re.search(r"^name:\s*unix60-row2col\s*$", meta, re.M),
+    )
+    check(
+        "[shape] snippet.yml appends its overlay",
+        "unix60-row2col.overlay" in meta,
+    )
+    check(
+        "[shape] module.yml declares snippet_root so the snippet is discoverable",
+        re.search(r"^\s*snippet_root:\s*\.\s*$", read("zephyr/module.yml"), re.M),
+    )
+
+    base = read(SHIELD + "/unix60.overlay")
+    base_rows = gpio_entries(base, "row-gpios")
+    base_cols = gpio_entries(base, "col-gpios")
+    snip_rows = gpio_entries(overlay, "row-gpios")
+    snip_cols = gpio_entries(overlay, "col-gpios")
+
+    check(
+        "[shape] snippet row pins are identical to the base shield, in order",
+        [p for p, _ in snip_rows] == [p for p, _ in base_rows],
+        "snippet %r vs base %r"
+        % ([p for p, _ in snip_rows], [p for p, _ in base_rows]),
+    )
+    check(
+        "[shape] snippet col pins are identical to the base shield, in order",
+        [p for p, _ in snip_cols] == [p for p, _ in base_cols],
+        "snippet %r vs base %r"
+        % ([p for p, _ in snip_cols], [p for p, _ in base_cols]),
+    )
+    check(
+        '[shape] snippet sets diode-direction "row2col"',
+        'diode-direction = "row2col"' in overlay,
+    )
+
+    # Inverted roles: rows drive (bare ACTIVE_HIGH), columns read (pull-down).
+    check(
+        "[shape] snippet rows are outputs — bare GPIO_ACTIVE_HIGH, no pull",
+        len(snip_rows) == ROWS
+        and all(f == "GPIO_ACTIVE_HIGH" for _, f in snip_rows),
+        "got %r" % ([f for _, f in snip_rows],),
+    )
+    check(
+        "[shape] snippet cols are inputs — ACTIVE_HIGH | PULL_DOWN",
+        len(snip_cols) == COLS
+        and all(
+            "GPIO_ACTIVE_HIGH" in f and "GPIO_PULL_DOWN" in f for _, f in snip_cols
+        ),
+        "got %r" % ([f for _, f in snip_cols],),
+    )
+    check(
+        "[shape] snippet flags are inverted relative to the base shield",
+        [f for _, f in snip_rows] != [f for _, f in base_rows]
+        and [f for _, f in snip_cols] != [f for _, f in base_cols],
+        "snippet and base carry the same flags — the snippet would be a no-op",
+    )
+
+    build = read("build.yaml")
+    check(
+        "[shape] build.yaml has the row2col entry",
+        "snippet: unix60-row2col" in build
+        and "artifact-name: unix60_row2col" in build,
+    )
+
+    # Same failure mode that once shipped a shield with no Kconfig.shield:
+    # present on disk, absent from git, so CI never sees it.
+    try:
+        tracked = set(
+            subprocess.run(
+                ["git", "ls-files", SNIPPET],
+                cwd=REPO,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.split()
+        )
+    except (subprocess.CalledProcessError, OSError) as exc:
+        check("[shape] snippet files are tracked by git", False, "%r" % (exc,))
+        return
+
+    want = {SNIPPET + "/snippet.yml", SNIPPET + "/unix60-row2col.overlay"}
+    check(
+        "[shape] snippet files are tracked by git",
+        want <= tracked,
+        "untracked: %r" % sorted(want - tracked),
+    )
+
+
 def run_check_group(name, fn):
     """Run one check_* group, converting a crash into a single FAIL line
     instead of an uncaught traceback. This is the whole test suite, so a bug
@@ -678,6 +796,7 @@ def main():
     run_check_group("check_metadata", check_metadata)
     run_check_group("check_completeness", check_completeness)
     run_check_group("check_images", check_images)
+    run_check_group("check_row2col_snippet", check_row2col_snippet)
 
     width = max(len(name) for name, _, _ in RESULTS)
     failed = 0

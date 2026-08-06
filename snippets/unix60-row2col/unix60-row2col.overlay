@@ -1,0 +1,47 @@
+/*
+ * Copyright (c) 2026 The ZMK Contributors
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Diagnostic variant: drives the matrix row2col instead of col2row.
+ *
+ * The stock Unix60 is col2row, which is what boards/shields/unix60 implements
+ * and what QMK's fr4/unix60 definition specifies. This snippet exists for a
+ * hand-assembled board whose diodes were installed reversed. Flipping the scan
+ * direction in firmware compensates, so a reversed board works without
+ * desoldering 63 parts.
+ *
+ * Only the scan direction and the GPIO flags change. The pins themselves are
+ * identical to the base shield, and tools/validate_shield.py asserts that —
+ * see check_row2col_snippet.
+ *
+ * If your keyboard works with the plain build, you do not want this.
+ */
+
+&kscan {
+    /* Reversed from the base shield's "col2row". */
+    diode-direction = "row2col";
+
+    /* row2col: rows drive, columns read. The flags swap; the pins do not. */
+    row-gpios
+        = <&pro_micro  1 GPIO_ACTIVE_HIGH>
+        , <&pro_micro  0 GPIO_ACTIVE_HIGH>
+        , <&pro_micro  2 GPIO_ACTIVE_HIGH>
+        , <&pro_micro  3 GPIO_ACTIVE_HIGH>
+        , <&pro_micro  4 GPIO_ACTIVE_HIGH>
+        , <&pro_micro  5 GPIO_ACTIVE_HIGH>
+        , <&pro_micro  6 GPIO_ACTIVE_HIGH>
+        ;
+
+    col-gpios
+        = <&pro_micro  7 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+        , <&pro_micro  8 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+        , <&pro_micro  9 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+        , <&pro_micro 21 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+        , <&pro_micro 20 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+        , <&pro_micro 19 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+        , <&pro_micro 18 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+        , <&pro_micro 15 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+        , <&pro_micro 14 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+        ;
+};

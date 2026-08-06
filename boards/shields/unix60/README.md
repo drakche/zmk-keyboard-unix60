@@ -25,6 +25,9 @@ no local Zephyr toolchain in this repo.
      `unix60_studio` entry, named via its `artifact-name`), which lets you
      remap keys at runtime without recompiling. Flash this one if you want to
      use Studio; otherwise the plain build is smaller and simpler.
+   - `unix60_row2col.uf2` — a **diagnostic** build only. See "Reversed
+     diodes" below. Do not flash this unless the plain build scans no keys
+     at all.
 3. Put the controller into bootloader mode: double-tap its reset button. A
    drive named `NICENANO` will mount on your computer.
 4. Drag the `.uf2` file you chose onto the `NICENANO` drive. It flashes and
@@ -91,6 +94,33 @@ ZMK ships `layouts/common/60percent/hhkb.dtsi`, but that is the HHKB/*Tsangan*
 variant: 2u backspace, unsplit right shift, seven-key bottom row. The Unix60 is
 true HHKB, so `unix60-layouts.dtsi` defines its own layout, transcribed from
 QMK's `LAYOUT_60_hhkb`.
+
+## Reversed diodes (`unix60_row2col` build)
+
+The Unix60 ships as a bare PCB, so the 63 diodes are hand-soldered. If they
+were all installed backwards, **no key registers at all** — and nothing in the
+firmware or CI can detect it, because the board is electrically consistent,
+just inverted.
+
+`snippets/unix60-row2col/` compensates in firmware rather than requiring 63
+parts to be desoldered: it overrides the kscan node to
+`diode-direction = "row2col"` and swaps the GPIO roles, so the rows drive and
+the columns read. The pins are unchanged.
+
+Only reach for it after ruling out the far more common causes of a totally
+dead matrix — a controller with no header pins soldered on, one not fully
+seated, or one mounted on the wrong side of the PCB (the controller belongs on
+the **back**, opposite the switches). To confirm the diodes are actually
+reversed, put a multimeter in **diode mode** (not continuity — the ~0.6 V drop
+won't trigger a continuity beeper), remove the controller, hold a key down and
+probe the two through-holes for that key's row and column pins. Conduction in
+the opposite polarity to the schematic means they're reversed.
+
+The snippet restates the pin lists in order to swap the flags, so the pins
+exist in two places. `tools/validate_shield.py` asserts they never drift:
+`check_row2col_snippet` requires the snippet's pins to equal the base
+shield's exactly, in the same order, with only the flags and scan direction
+inverted.
 
 ## Note for Pro Micro nRF52840 (SuperMini) controllers
 
